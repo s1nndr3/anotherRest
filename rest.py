@@ -9,12 +9,13 @@ import ssl
 from enum import Enum
 import json
 import pandas as pa
+from log import Loging
 
 from cookie import *
 
 
 context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-context.load_cert_chain('sertificate/selfsigned.crt','sertificate/selfsigned.key')
+context.load_cert_chain('sertificate/fullchain.pem','sertificate/privkey.pem')
 
 AES_key = b'\xa06\xf5\xb5J)\xb9\x02\xa4K\x97\xc6\x94\x8b\xea%' #get_random_bytes(16) #used for cookie
 print(AES_key)
@@ -24,12 +25,13 @@ http_code_csv = "http_status.csv"
 http_code = pa.read_csv(http_code_csv, sep=",", comment='#')
 
 
-class RestApi():
-	def __init__(self):
-		self.port = 8080
-		self.host = "localhost"
+class RestApi(Loging):
+	def __init__(self, port = None, host = None):
+		self.port = 8080 if not port else port
+		self.host = "localhost" if not host else host
 		self.conn_list = []
 		self.func = []
+		self.log_file = "connection_log.txt"
 
 		self.socket = socket(AF_INET, SOCK_STREAM)#socket setup
 		while(True):
@@ -54,6 +56,7 @@ class RestApi():
 		connect.start()
 		handle.start()
 		print("Startup complete!")
+		self.log_entry("Startup complete!")
 		print(f"the server ({self.host}) is listening on port {self.port}")
 		#print("Functions: \n", self.func)
 
@@ -72,6 +75,7 @@ class RestApi():
 				print(error)
 				continue
 			
+			#print(f"Connection from: {addr}")
 			self.conn_cond_v.acquire(blocking=True, timeout=-1)
 			self.conn_list.insert(0, [conn, addr])
 			#print("LIST LEN = ", len(self.conn_list))
@@ -87,7 +91,7 @@ class RestApi():
 				conn, addr = self.conn_list.pop()
 				self.conn_cond_v.release()
 
-				conn_h = threading.Thread(target=handle, args=(conn, addr, self.func))
+				conn_h = threading.Thread(target=handle, args=(conn, addr, self.func, self.log_entry))
 				conn_h.start()
 
 			else:
@@ -129,7 +133,7 @@ def pars_url(url):
 	
 
 
-def handle(conn, addr, funcs):
+def handle(conn, addr, funcs, logfunc):
 	ip_addr = str_partition(str(addr), ("('"), ("',"))
 
 	"""Retrive raw data"""
@@ -160,7 +164,8 @@ def handle(conn, addr, funcs):
 	method = str_partition(header, None, (" "))
 	url = str_partition(header, (" "), (" "))
 	path, request = pars_url(url)
-	print(f"Path: {path}\nargs: {request}")
+	print(f"addr: {addr} Path: {path} args: {request}")
+	logfunc(f"addr: {addr} Path: {path} nargs: {request}")
 	func_entry = [x for x in funcs if x[0] == url and x[1] == method]
 
 	par = args()
@@ -213,20 +218,20 @@ def str_partition(str, start = None, end = None):
 			return None
 	return ret
 
-def Responce(str, code, headder_add = None):
+def Responce(data: str, code: int, headder_add = None, text_type = "text/plain"):
 	row = (http_code.loc[http_code["status"] == code])
 	status = row["status_description"].values[0] #haha
 
 	headder = f"HTTP/1.1 {code}  {status}\r\n"
-	headder += "Content-Type: text/plain; charset=utf-8\r\n"
-	headder += f"Content-Length: {len(str)}\r\n"
+	headder += f"Content-Type: {text_type}; charset=utf-8\r\n"
+	headder += f"Content-Length: {len(data)}\r\n"
 	if(headder_add):
 		headder += f"{headder_add}\r\n"
 	headder += "\r\n"
 
-	responce = headder + str
+	responce = headder + data
 	
-	print(responce)
+	#print(responce)
 	return responce
 
 

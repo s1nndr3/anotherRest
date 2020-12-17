@@ -26,7 +26,7 @@ def cookie_decode(_input, key):
 		cipher = AES.new(key, AES.MODE_CBC, iv)
 		pt = unpad(cipher.decrypt(ct), AES.block_size)
 		return pt.decode("utf-8")
-	except ValueError and KeyError:
+	except ValueError and KeyError and TypeError:
 		return None
 
 def new_raw_cookie(session_id = "-1", acc_id = "-1", expires = "-1"):
