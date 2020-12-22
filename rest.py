@@ -10,7 +10,7 @@ from enum import Enum
 import json
 import pandas as pa
 from log import Loging
-
+import os
 from cookie import *
 
 
@@ -191,7 +191,14 @@ def handle(conn, addr, funcs, logfunc):
 		responce = Responce("Server error", 500)
 
 	"""Send responce and close conection"""
-	conn.send(responce.encode('utf-8'))
+	#if type(responce) == tuple:
+	conn.send(responce[0].encode('utf-8'))
+	while responce[1]:
+		l = responce[1].read(1024)
+		if not l:
+			responce[1].close()
+			break
+		conn.send(l)
 	conn.close()
 
 class args():
@@ -218,13 +225,15 @@ def str_partition(str, start = None, end = None):
 			return None
 	return ret
 
-def Responce(data: str, code: int, headder_add = None, text_type = "text/plain"):
+def Responce(data: str, code: int, headder_add = None, text_type = "text/plain", fp = None):
 	row = (http_code.loc[http_code["status"] == code])
 	status = row["status_description"].values[0] #haha
 
+	file_size = 0 if not fp else os.path.getsize(fp.name)
+
 	headder = f"HTTP/1.1 {code}  {status}\r\n"
 	headder += f"Content-Type: {text_type}; charset=utf-8\r\n"
-	headder += f"Content-Length: {len(data)}\r\n"
+	headder += f"Content-Length: {len(data)+file_size}\r\n"
 	if(headder_add):
 		headder += f"{headder_add}\r\n"
 	headder += "\r\n"
@@ -232,7 +241,7 @@ def Responce(data: str, code: int, headder_add = None, text_type = "text/plain")
 	responce = headder + data
 	
 	#print(responce)
-	return responce
+	return [responce, fp]
 
 
 """Login class"""

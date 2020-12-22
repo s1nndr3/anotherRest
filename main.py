@@ -10,10 +10,6 @@ from base64 import b64encode
 API = RestApi(port = 54387, host = "0.0.0.0")
 log = Login()
 
-file = open('../Bed-2056-Project/parking_vs_weather.html',mode='r')
-parking = file.read()
-file.close()
-
 @API.functionality("/", "GET")
 @log.login_required()
 def index(_id):
@@ -21,15 +17,14 @@ def index(_id):
 
 @API.functionality("/parking", "GET")
 def index(_id):
-	return Responce(parking, 200, text_type = "text/html")
+	fp =  open("../Bed-2056-Project/parking_vs_weather.html", "rb")
+	return Responce("", 200, text_type = "text/html", fp = fp)
 
-@API.functionality("/update-parking", "POST")
+@API.functionality("/data.zip", "GET")
 def index(_id):
-	global parking 
-	file = open('../Bed-2056-Project/parking_vs_weather.html',mode='r')
-	parking = file.read()
-	file.close()
-	return Responce("Success", 200)
+	add =  f"Content-Description: File Transfer"
+	fp =  open("../Bed-2056-Project/data.zip", "rb")
+	return Responce("", 200, headder_add = add, text_type = "application/zip", fp = fp)
 
 if __name__ == "__main__":
 	API.start()
