@@ -11,9 +11,11 @@ API = RestApi(port = 54387, host = "0.0.0.0")
 log = Login()
 
 @API.functionality("/", "GET")
-@log.login_required()
+#@log.login_required()
 def index(_id):
-	return Responce("test", 200)
+	fp = open("../websites/html-css/template.html", "rb")
+	return Responce("", 200, text_type = "text/html", fp = fp)
+	""" return Responce("test", 200) """
 
 @API.functionality("/parking", "GET")
 def index(_id):
@@ -25,6 +27,12 @@ def index(_id):
 	add =  f"Content-Description: File Transfer"
 	fp =  open("../Bed-2056-Project/data.zip", "rb")
 	return Responce("", 200, headder_add = add, text_type = "application/zip", fp = fp)
+
+@API.functionality("/*", "GET")
+def index(_id):
+	pass
+
+API.multiple("../websites/html-css/")
 
 if __name__ == "__main__":
 	API.start()
