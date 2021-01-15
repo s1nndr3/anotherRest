@@ -120,6 +120,25 @@ class RestApi(Loging):
 			return wrapper
 		return decorator
 
+	def makefunction(self, loc:str, file:str, pre:str):
+		@self.functionality(f"{pre}/{file}", "GET")
+		def func(_id):
+			fp = open(f"{loc}/{file}", "rb")
+			return Responce("", 200, text_type = "text/"+file.split(".")[1], fp = fp)
+
+
+	# Add souport to get multiple files in a file
+	def multiple(self, loc, pre = ""):
+		files = os.listdir(loc)
+		for f in files:
+			if(os.path.isdir(loc + f)):
+				self.multiple(f"{loc + f}/", pre+"/"+f)
+				continue
+
+			self.makefunction(str(loc), str(f), str(pre))
+			print(f"made: {pre}/{f}")
+
+
 def pars_url(url):
 	path = str_partition(url, end = "?")
 	request = str_partition(url, start = "?")
