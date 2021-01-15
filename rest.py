@@ -71,8 +71,11 @@ class RestApi(Loging):
 			try:
 				conn, addr = self.wrapped_socket.accept()#accept conection
 			except OSError as error:
-				print("feiled!! OSError")
+				print(f"feiled!! OSError")
 				print(error)
+				continue
+			except:
+				print("Unexpected error!", sys.exc_info()[0])
 				continue
 			
 			#print(f"Connection from: {addr}")
