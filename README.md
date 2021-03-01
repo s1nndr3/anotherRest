@@ -20,5 +20,6 @@ Note. work in progress ***Do not use for critical work or sensetive data.***
 #### Other important notes:
 - ***Do not*** use the certificate in the certificate folder, It is only for demonstration purposes.
 - The provided login and cookie support is not finished or properly tested and may have security bugs in them.
+- If you do not provide the Login class with a AES-key when initialized: It will generate a new random key and therefore invalidate the cookies previously sent by the server.
 
 Stop with: CTRL+c

@@ -9,7 +9,7 @@ CERTIFICATE = {"CERTIFICATE": 'sertificate/selfsigned.crt', "PRIVATEKEY" : 'sert
 API = RestApi(port = 54387, host = "0.0.0.0", cert = CERTIFICATE)
 
 #initialize Login 
-log = Login()
+log = Login(b'\xc8\x0fmF\xc7\x14\xb8\x1c\x05\xd4\xbe|\xd3\t\x16\xa0')
 
 # Example of simple endpoint.
 @API.functionality("/", "GET")

@@ -188,7 +188,8 @@ def handle(conn, addr, funcs, logfunc):
 		func_entry = func_entry[0]
 		try:
 			responce = func_entry[2](par)
-		except Exception:
+		except Exception as e:
+			print(e)
 			responce = Responce("error", 400)
 	else:
 		print("Error: Endpoint do not exist!!!!")
