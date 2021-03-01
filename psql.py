@@ -3,6 +3,7 @@
 #By Sindre Sønvisen sindre@sundvis.net
 
 import psycopg2
+import json
 
 UniqueViolation = psycopg2.errors.lookup('23505')
 ForeignKeyViolation = psycopg2.errors.lookup('23503')
@@ -20,9 +21,9 @@ class Psql():
 		#Open connection
 		self.conn = psycopg2.connect(
 			host = "localhost",
-			database = "vehicle_data",
-			user = "vehicle",
-			password = "vehicle-list",
+			database = "blogg",
+			user = "blogger",
+			password = "2341blogg",
 			port = 5432 
 		)
 
@@ -58,9 +59,37 @@ class Psql():
 
 if __name__ == "__main__":
 	db = Psql()
-	query = "SELECT * FROM account"
+	""" query = "SELECT * FROM account"
+	res = db.fetchall(query)
+	print(res) """
+
+	""" query = "SELECT * FROM account WHERE email=%s"
+	val = "s@s.net"
+	res = db.fetchone(query, val)
+	print(res) """
+
+	""" query = "INSERT INTO post (date_time, post_text) VALUES (CURRENT_TIMESTAMP, %s) RETURNING id"
+	val = "asdasidasdasd"
+	_id = db.fetchone(query, val)
+	print(_id[0])
+
+	query = "INSERT INTO account_post (account_id, post_id) VALUES (%s, %s)"
+	val = 1, _id
+	db.execute(query, *val) """
+
+	query = "SELECT * FROM post limit 10"
 	res = db.fetchall(query)
 	print(res)
+	#j = "{date:'" + str(res[0][1]) +"', text:'" + res[0][2] + "'}"
+	ret = []
+	for r in res:
+		d = {
+			"date": str(res[0][1]), 
+			"text": str(res[0][2])
+			}
+		ret.append(json.dumps(d))
+	print(str(ret))
+
 
 
 

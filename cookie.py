@@ -37,8 +37,8 @@ def new_raw_cookie(session_id = "-1", acc_id = "-1", expires = "-1"):
 	json_str += "}"
 	return json_str#json.loads(json_str)
 
-def cookie_headder(cookie_encoded):
+def cookie_headder(cookie_encoded, max_age = 432000):
 	if (cookie_encoded):
-		return f"Set-Cookie: {cookie_encoded}; SameSite=Strict; Secure"
+		return f"Set-Cookie: acc={cookie_encoded}; SameSite=Strict; Secure; Max-Age={max_age}"
 	else:
 		return None

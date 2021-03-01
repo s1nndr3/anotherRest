@@ -127,13 +127,18 @@ class RestApi(Loging):
 		@self.functionality(f"{pre}/{file}", "GET")
 		def func(_id):
 			fp = open(f"{loc}/{file}", "rb")
-			return Responce("", 200, text_type = "text/"+file.split(".")[1], fp = fp)
+			mime = file.split(".")[1]
+			mime = "javascript" if mime == "js" else mime
+			return Responce("", 200, text_type = "text/"+mime, fp = fp)
 
 
 	# Add souport to get multiple files in a file
+	# Use a "." in the beggining to ignore files or folders
 	def multiple(self, loc, pre = ""):
 		files = os.listdir(loc)
 		for f in files:
+			if f[0] == ".":
+				continue
 			if(os.path.isdir(loc + f)):
 				self.multiple(f"{loc + f}/", pre+"/"+f)
 				continue
@@ -141,7 +146,7 @@ class RestApi(Loging):
 			self.makefunction(str(loc), str(f), str(pre))
 			print(f"made: {pre}/{f}")
 
-
+#Bad
 def pars_url(url):
 	path = str_partition(url, end = "?")
 	request = str_partition(url, start = "?")
@@ -173,37 +178,30 @@ def handle(conn, addr, funcs, logfunc):
 	data = data.strip().decode('utf-8')
 	header = str_partition(data, None, "\r\n\r\n")
 	body = str_partition(data, "\r\n\r\n", None)
-
-	cookie = str_partition(header, "Cookie: ", "\n")#Selecting just the first
+	cookie = str_partition(header, "Cookie: acc=", "\n")#Selecting just the first
 	if(cookie):
-		cookie = cookie[2:].encode()#not pretty, but it works
+		cookie = cookie[2:].encode() #not pretty, but it works
 
-
-	""" print("\nheader: \n", header)
-	print("\nbody: \n", body) """
-
-	"""Find method and url"""
+	"""Find method, url/path and request"""
 	method = str_partition(header, None, (" "))
 	url = str_partition(header, (" "), (" "))
-	path, request = pars_url(url)
-	print(f"addr: {addr} Path: {path} args: {request}")
-	logfunc(f"addr: {addr} Path: {path} nargs: {request}")
-	func_entry = [x for x in funcs if x[0] == url and x[1] == method]
+
+	path, request, *_ = url.split("?") + [None]
+
+	func_entry = [x for x in funcs if x[0] == path and x[1] == method]
+	print(func_entry)
 
 	par = args()
 	par.cookie = cookie
 	par.data = body
-	par.request = None
+	par.request = request
 
 	"""Call correct function and get back a responce"""
 	responce = None
 	if(len(func_entry) > 0):
 		func_entry = func_entry[0]
 		try:
-			if (func_entry[1] == "POST"):
-				responce = func_entry[2](body)
-			else:
-				responce = func_entry[2](par)
+			responce = func_entry[2](par)
 		except Exception as error:
 			responce = Responce(error, 400)
 	else:
@@ -228,6 +226,7 @@ class args():
 		self.cookie = None
 		self.data = None
 		self.request = None
+		self.id = None
 
 
 
@@ -272,33 +271,34 @@ class Login():
 		#self.logged_list = []
 		pass
 
-	def login(self, acc_id, expires):
+	def login(self, acc_id:int, expires:int):
 		raw = new_raw_cookie(acc_id=acc_id, expires=expires)
 		headder = cookie_headder(cookie_encode(raw, AES_key))
 		return headder
 
-		#self.logged_list.insert(0, (cookie, acc_id, acc_type))
-
 	def logout(self, cookie):
-		#self.logged_list = [x for x in self.logged_list if x[0] != cookie]
-		pass
+		if not self.is_loggedin(cookie):
+			raise Exception("Was not logged in")
+
+		headder = cookie_headder(cookie, 0)
+		return headder
 
 	def is_loggedin(self, cookie):
 		if(not cookie):
 			return None
 
 		raw = cookie_decode(cookie, AES_key)
-		print(raw)
-		return raw
+		return json.loads(raw)["acc_id"]
 
 	def login_required(self, r_type = None):
 		def decorator(func):
-			def wrapper(cookie):
-				print("wraper test", r_type, cookie)
-				_id = self.is_loggedin(cookie)
+			def wrapper(par):
+				print("wraper test", r_type, par.cookie)
+				_id = self.is_loggedin(par.cookie)
 				if (_id == None):
 					return Responce("Unauthorized", 401)
-				return func(_id)
+				par.id = _id
+				return func(par)
 			return wrapper
 		return decorator
 
