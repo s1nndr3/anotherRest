@@ -13,9 +13,8 @@ from log import Loging
 import os
 from cookie import *
 
-
-context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-context.load_cert_chain('sertificate/fullchain.pem','sertificate/privkey.pem')
+CERTIFICATE = None
+PRIVATEKEY = None
 
 AES_key = b'\xa06\xf5\xb5J)\xb9\x02\xa4K\x97\xc6\x94\x8b\xea%' #get_random_bytes(16) #used for cookie
 print(AES_key)
@@ -26,13 +25,14 @@ http_code = pa.read_csv(http_code_csv, sep=",", comment='#')
 
 
 class RestApi(Loging):
-	def __init__(self, port = None, host = None):
+	def __init__(self, port = None, host = None, cert = None):
 		self.port = 8080 if not port else port
 		self.host = "localhost" if not host else host
 		self.conn_list = []
 		self.func = []
 		self.log_file = "connection_log.txt"
 
+		#Create socket
 		self.socket = socket(AF_INET, SOCK_STREAM)#socket setup
 		while(True):
 			try:
@@ -43,8 +43,14 @@ class RestApi(Loging):
 				time.sleep(0.5)
 
 		self.socket.listen()
-		#use when updating to https!!!
-		self.wrapped_socket = context.wrap_socket(self.socket, server_side=True)
+
+		#Wrap socket to Https
+		if cert:
+			context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+			context.load_cert_chain(cert["CERTIFICATE"],cert["PRIVATEKEY"])
+			self.wrapped_socket = context.wrap_socket(self.socket, server_side=True)
+		else:
+			self.wrapped_socket = self.socket
 
 	def start(self):
 		self.conn_lock = threading.Lock()
@@ -58,16 +64,14 @@ class RestApi(Loging):
 		print("Startup complete!")
 		self.log_entry("Startup complete!")
 		print(f"the server ({self.host}) is listening on port {self.port}")
-		#print("Functions: \n", self.func)
 
-		#self.stop()
 		connect.join()
 		handle.join()
 		self.stop()
 
 	def connect(self):
 		while(True):
-			#print(self.conn_list)
+
 			try:
 				conn, addr = self.wrapped_socket.accept()#accept conection
 			except OSError as error:
@@ -78,14 +82,12 @@ class RestApi(Loging):
 				print("Unexpected error!", sys.exc_info()[0])
 				continue
 			
-			#print(f"Connection from: {addr}")
+
 			self.conn_cond_v.acquire(blocking=True, timeout=-1)
 			self.conn_list.insert(0, [conn, addr])
-			#print("LIST LEN = ", len(self.conn_list))
+
 			self.conn_cond_v.notify(n=1)
 			self.conn_cond_v.release()
-			#print(f"Connection by {addr} inserted to list")
-
 
 	def handle_start(self):
 		while (True):
@@ -102,7 +104,7 @@ class RestApi(Loging):
 				self.conn_cond_v.release()
 
 	def stop(self):
-		socket(AF_INET, SOCK_STREAM).connect( (self.host, self.port))
+		socket(AF_INET, SOCK_STREAM).connect((self.host, self.port))
 		self.wrapped_socket.close()
 		self.socket.close()
 
