@@ -1,5 +1,5 @@
 #REST API
-#Version: 0.0.1 July 2020
+#Version: 0.0.2 March 2021
 #By Sindre Sønvisen sindre@sundvis.net
 
 from socket import *
@@ -15,9 +15,6 @@ from cookie import *
 
 CERTIFICATE = None
 PRIVATEKEY = None
-
-AES_key = b'\xa06\xf5\xb5J)\xb9\x02\xa4K\x97\xc6\x94\x8b\xea%' #get_random_bytes(16) #used for cookie
-print(AES_key)
 
 #Used in the response function
 http_code_csv = "http_status.csv"
@@ -71,7 +68,6 @@ class RestApi(Loging):
 
 	def connect(self):
 		while(True):
-
 			try:
 				conn, addr = self.wrapped_socket.accept()#accept conection
 			except OSError as error:
@@ -81,7 +77,6 @@ class RestApi(Loging):
 			except:
 				print("Unexpected error!", sys.exc_info()[0])
 				continue
-			
 
 			self.conn_cond_v.acquire(blocking=True, timeout=-1)
 			self.conn_list.insert(0, [conn, addr])
@@ -108,9 +103,9 @@ class RestApi(Loging):
 		self.wrapped_socket.close()
 		self.socket.close()
 
-	# The function is stored in a list with goresponding route and methodwhen using: 
+	# The function is stored in a list with goresponding route and methodwhen using:
 	#@RestApi.functionality("arg1", "arg2")
-	#def function():
+	#def function(par):
 	#	"""Do someting"""
 	def functionality(self, url, method):
 		def decorator(original_func):
@@ -125,16 +120,17 @@ class RestApi(Loging):
 			return wrapper
 		return decorator
 
-	def makefunction(self, loc:str, file:str, pre:str):
+	""" Only used internally by the multiple function"""
+	def _makefunction(self, loc:str, file:str, pre:str):
 		@self.functionality(f"{pre}/{file}", "GET")
-		def func(_id):
+		def func(par):
 			fp = open(f"{loc}/{file}", "rb")
 			mime = file.split(".")[1]
 			mime = "javascript" if mime == "js" else mime
 			return Responce("", 200, text_type = "text/"+mime, fp = fp)
 
 
-	# Add souport to get multiple files in a file
+	# Add souport to get multiple files in a folder
 	# Use a "." in the beggining to ignore files or folders
 	def multiple(self, loc, pre = ""):
 		files = os.listdir(loc)
@@ -145,23 +141,11 @@ class RestApi(Loging):
 				self.multiple(f"{loc + f}/", pre+"/"+f)
 				continue
 
-			self.makefunction(str(loc), str(f), str(pre))
+			self._makefunction(str(loc), str(f), str(pre))
 			print(f"made: {pre}/{f}")
 
-#Bad
-def pars_url(url):
-	path = str_partition(url, end = "?")
-	request = str_partition(url, start = "?")
-	r = []
-	while request:
-		print(request)
-		r.append(str_partition(request, end = "&"))
-		request = str_partition(request, start = "&")
-
-	return path, r
-	
-
-
+""" Function that handles each request
+	- Note. Started by multiple threads simultaneously"""
 def handle(conn, addr, funcs, logfunc):
 	ip_addr = str_partition(str(addr), ("('"), ("',"))
 
@@ -204,8 +188,8 @@ def handle(conn, addr, funcs, logfunc):
 		func_entry = func_entry[0]
 		try:
 			responce = func_entry[2](par)
-		except Exception as error:
-			responce = Responce(error, 400)
+		except Exception:
+			responce = Responce("error", 400)
 	else:
 		print("Error: Endpoint do not exist!!!!")
 		responce = Responce("Endpoint do not exist", 404)
@@ -269,13 +253,13 @@ def Responce(data: str, code: int, headder_add = None, text_type = "text/plain",
 
 """Login class"""
 class Login():
-	def __init__(self):
-		#self.logged_list = []
-		pass
+	def __init__(self, AES_key = None):
+		self.AES_key = AES_key if AES_key else get_random_bytes(16)
+		print(self.AES_key)
 
 	def login(self, acc_id:int, expires:int):
 		raw = new_raw_cookie(acc_id=acc_id, expires=expires)
-		headder = cookie_headder(cookie_encode(raw, AES_key))
+		headder = cookie_headder(cookie_encode(raw, self.AES_key))
 		return headder
 
 	def logout(self, cookie):
@@ -289,13 +273,12 @@ class Login():
 		if(not cookie):
 			return None
 
-		raw = cookie_decode(cookie, AES_key)
+		raw = cookie_decode(cookie, self.AES_key)
 		return json.loads(raw)["acc_id"]
 
 	def login_required(self, r_type = None):
 		def decorator(func):
 			def wrapper(par):
-				print("wraper test", r_type, par.cookie)
 				_id = self.is_loggedin(par.cookie)
 				if (_id == None):
 					return Responce("Unauthorized", 401)
@@ -306,12 +289,6 @@ class Login():
 
 
 if __name__ == "__main__":
-	#API = RestApi()
-	#API.start()
-	test = cookie(1, 1)
-	t = test.encode(AES_key)
-	print(t)
-	t2 = test.decode(t, AES_key)
-	print(t2)
+	pass
 
 
