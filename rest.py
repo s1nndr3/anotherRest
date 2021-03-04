@@ -6,20 +6,16 @@ from socket import *
 import threading
 import time
 import ssl
-from enum import Enum
-import json
-import pandas as pa
-from log import Loging
 import os
-from cookie import *
 
-CERTIFICATE = None
-PRIVATEKEY = None
-
-#Used in the response function
-http_code_csv = "http_status.csv"
-http_code = pa.read_csv(http_code_csv, sep=",", comment='#')
-
+if __package__:
+	from .log import Loging
+	from .cookie import *
+	from .httpstatus import get_status
+else:
+	from log import Loging
+	from cookie import *
+	from httpstatus import get_status
 
 class RestApi(Loging):
 	def __init__(self, port = None, host = None, cert = None):
@@ -91,7 +87,7 @@ class RestApi(Loging):
 				conn, addr = self.conn_list.pop()
 				self.conn_cond_v.release()
 
-				conn_h = threading.Thread(target=handle, args=(conn, addr, self.func, self.log_entry))
+				conn_h = threading.Thread(target=_handle, args=(conn, addr, self.func, self.log_entry))
 				conn_h.start()
 
 			else:
@@ -146,7 +142,7 @@ class RestApi(Loging):
 
 """ Function that handles each request
 	- Note. Started by multiple threads simultaneously"""
-def handle(conn, addr, funcs, logfunc):
+def _handle(conn, addr, funcs, logfunc):
 	ip_addr = str_partition(str(addr), ("('"), ("',"))
 
 	"""Retrive raw data"""
@@ -234,8 +230,8 @@ def str_partition(str, start = None, end = None):
 	return ret
 
 def Responce(data: str, code: int, headder_add = None, text_type = "text/plain", fp = None):
-	row = (http_code.loc[http_code["status"] == code])
-	status = row["status_description"].values[0] #haha
+
+	status = get_status(code)
 
 	file_size = 0 if not fp else os.path.getsize(fp.name)
 
