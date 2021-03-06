@@ -6,7 +6,7 @@ from rest import RestApi, Responce, Login
 
 # If the rest api shuld use https include certificate and key like:
 CERTIFICATE = {"CERTIFICATE": 'sertificate/selfsigned.crt', "PRIVATEKEY" : 'sertificate/selfsigned.key'}
-API = RestApi(port = 54387, host = "0.0.0.0", cert = CERTIFICATE)
+API = RestApi(port = 8080, host = "0.0.0.0", cert = CERTIFICATE)
 
 #initialize Login 
 log = Login(b'\xc8\x0fmF\xc7\x14\xb8\x1c\x05\xd4\xbe|\xd3\t\x16\xa0')

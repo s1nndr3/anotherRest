@@ -3,10 +3,11 @@
 #By Sindre Sønvisen sindre@sundvis.net
 
 from socket import *
-import threading
+import threading as th
 import time
 import ssl
 import os
+import sys
 
 if __package__:
 	from .log import Loging
@@ -18,14 +19,22 @@ else:
 	from httpstatus import get_status
 
 class RestApi(Loging):
-	def __init__(self, port = None, host = None, cert = None):
-		self.port = 8080 if not port else port
-		self.host = "localhost" if not host else host
-		self.conn_list = []
+	def __init__(self, port = 8080, host = "localhost", cert = None, log_file = "connection_log.txt"):
+		self.port = port
+		self.host = host
+		
 		self.func = []
-		self.log_file = "connection_log.txt"
+		self.log_file = log_file
+
+		self.work_pool = []
+		self.work_queue = work_list()
+
+		self.socket = self.wrapped_socket = None
 
 		#Create socket
+		self._setup_socket(cert)
+		
+	def _setup_socket(self, cert = None):
 		self.socket = socket(AF_INET, SOCK_STREAM)#socket setup
 		while(True):
 			try:
@@ -45,64 +54,59 @@ class RestApi(Loging):
 		else:
 			self.wrapped_socket = self.socket
 
+	""" Call this when user want to start the server """
 	def start(self):
-		self.conn_lock = threading.Lock()
-		self.conn_cond_v = threading.Condition(lock=self.conn_lock)
+		for i in range(0, 3):
+			t = th.Thread(target=worker, args=(self.work_queue, i, self.func))
+			t.start()
+			self.work_pool.append(t)
 
-		connect = threading.Thread(target=self.connect, args=())
-		handle = threading.Thread(target=self.handle_start, args=())
+		print("Worker(s) startup complete!")
+		self._connect()
+ 	
+		self._stop()
 
-		connect.start()
-		handle.start()
-		print("Startup complete!")
-		self.log_entry("Startup complete!")
-		print(f"the server ({self.host}) is listening on port {self.port}")
 
-		connect.join()
-		handle.join()
-		self.stop()
-
-	def connect(self):
+	""" Internal function to receive connections
+		- Receive connection
+		- Put connection on the work queue """
+	def _connect(self):
 		while(True):
 			try:
-				conn, addr = self.wrapped_socket.accept()#accept conection
+				conn, addr = self.wrapped_socket.accept()# accept conection
 			except OSError as error:
 				print(f"feiled!! OSError")
 				print(error)
 				continue
+			except KeyboardInterrupt: # Not ideal, should use signal
+				break
 			except:
 				print("Unexpected error!", sys.exc_info()[0])
 				continue
 
-			self.conn_cond_v.acquire(blocking=True, timeout=-1)
-			self.conn_list.insert(0, [conn, addr])
+			self.work_queue.put({"conn": conn, "addr": addr})
 
-			self.conn_cond_v.notify(n=1)
-			self.conn_cond_v.release()
+	""" Internal function to stop
+		- Send stop code (-1) to all workers
+		- Join all workers 
+		- close socket(s) """
+	def _stop(self):
+		for p in self.work_pool:
+			self.work_queue.put(-1)
 
-	def handle_start(self):
-		while (True):
-			self.conn_cond_v.acquire(blocking=True, timeout=-1)
-			if (len(self.conn_list) > 0):
-				conn, addr = self.conn_list.pop()
-				self.conn_cond_v.release()
+		for p in self.work_pool:
+			p.join()
 
-				conn_h = threading.Thread(target=_handle, args=(conn, addr, self.func, self.log_entry))
-				conn_h.start()
-
-			else:
-				self.conn_cond_v.wait(timeout=None) #wait for more conections
-				self.conn_cond_v.release()
-
-	def stop(self):
-		socket(AF_INET, SOCK_STREAM).connect((self.host, self.port))
 		self.wrapped_socket.close()
 		self.socket.close()
 
-	# The function is stored in a list with goresponding route and methodwhen using:
-	#@RestApi.functionality("arg1", "arg2")
-	#def function(par):
-	#	"""Do someting"""
+		print("Shut down success")
+
+	""" The function is stored in a list with goresponding route and methodwhen using:
+	@RestApi.functionality("arg1", "arg2")
+	def function(par):
+		...Do someting... 
+	"""
 	def functionality(self, url, method):
 		def decorator(original_func):
 
@@ -126,8 +130,8 @@ class RestApi(Loging):
 			return Responce("", 200, text_type = "text/"+mime, fp = fp)
 
 
-	# Add souport to get multiple files in a folder
-	# Use a "." in the beggining to ignore files or folders
+	""" Add souport to get multiple files in a folder
+	Use a "." in the beggining to ignore files or folders """
 	def multiple(self, loc, pre = ""):
 		files = os.listdir(loc)
 		for f in files:
@@ -140,9 +144,76 @@ class RestApi(Loging):
 			self._makefunction(str(loc), str(f), str(pre))
 			print(f"made: {pre}/{f}")
 
+
+""" Response function """
+def Responce(data: str, code: int, headder_add = None, text_type = "text/plain", fp = None):
+
+	status = get_status(code)
+
+	file_size = 0 if not fp else os.path.getsize(fp.name)
+
+	headder = f"HTTP/1.1 {code}  {status}\r\n"
+	headder += f"Content-Type: {text_type}; charset=utf-8\r\n"
+	headder += f"Content-Length: {len(data)+file_size}\r\n"
+	if(headder_add):
+		headder += f"{headder_add}\r\n"
+	headder += "\r\n"
+
+	responce = headder + data
+	
+	#print(responce)
+	return [responce, fp]
+
+
+""" Thread safe list 
+	- FIFO """
+class work_list():
+	def __init__(self):
+		self.list = []
+		self.lock = th.Lock()
+		self.cond_v = th.Condition(lock=self.lock)
+
+	""" Put value at the beginning """
+	def put(self, val, timeout = -1):
+		self.cond_v.acquire(blocking=True, timeout=timeout)
+		
+		self.list.insert(0, val)
+
+		self.cond_v.notify(n=1)
+		self.cond_v.release()
+
+	""" Pop from the end"""
+	def get(self, timeout = -1):
+		while(True):
+			self.cond_v.acquire(blocking=True, timeout=timeout)
+			if (len(self.list) > 0):
+				val = self.list.pop()
+				self.cond_v.release()
+				return val
+			else:
+				self.cond_v.wait(timeout=None) #wait for more
+				self.cond_v.release()
+
+	def empty(self):
+		return (len(self.list) == 0)
+
+""" Thread worker
+	- wait on something to handle
+	- -1 is exit code """
+def worker(queue, _id, funcs):
+	print(f"Hello from process {_id}")
+	while(True):
+		c = queue.get()
+		if(c == -1):
+			return
+		conn = c["conn"]
+		addr = c["addr"]
+		_handle(conn, addr, funcs)
+
+
 """ Function that handles each request
 	- Note. Started by multiple threads simultaneously"""
-def _handle(conn, addr, funcs, logfunc):
+def _handle(conn, addr, funcs):
 	ip_addr = str_partition(str(addr), ("('"), ("',"))
 
 	"""Retrive raw data"""
@@ -173,10 +244,13 @@ def _handle(conn, addr, funcs, logfunc):
 	func_entry = [x for x in funcs if x[0] == path and x[1] == method]
 	print(func_entry)
 
-	par = args()
-	par.cookie = cookie
-	par.data = body
-	par.request = request
+
+	par = {
+		"cookie": cookie,
+		"data": data,
+		"request": request,
+		"id": None
+	}
 
 	"""Call correct function and get back a responce"""
 	responce = None
@@ -204,15 +278,6 @@ def _handle(conn, addr, funcs, logfunc):
 		conn.send(l)
 	conn.close()
 
-class args():
-	def __init__(self):
-		self.cookie = None
-		self.data = None
-		self.request = None
-		self.id = None
-
-
-
 def str_partition(str, start = None, end = None):
 	ret = str
 
@@ -228,24 +293,6 @@ def str_partition(str, start = None, end = None):
 		except IndexError:
 			return None
 	return ret
-
-def Responce(data: str, code: int, headder_add = None, text_type = "text/plain", fp = None):
-
-	status = get_status(code)
-
-	file_size = 0 if not fp else os.path.getsize(fp.name)
-
-	headder = f"HTTP/1.1 {code}  {status}\r\n"
-	headder += f"Content-Type: {text_type}; charset=utf-8\r\n"
-	headder += f"Content-Length: {len(data)+file_size}\r\n"
-	if(headder_add):
-		headder += f"{headder_add}\r\n"
-	headder += "\r\n"
-
-	responce = headder + data
-	
-	#print(responce)
-	return [responce, fp]
 
 
 """Login class"""
@@ -276,10 +323,10 @@ class Login():
 	def login_required(self, r_type = None):
 		def decorator(func):
 			def wrapper(par):
-				_id = self.is_loggedin(par.cookie)
+				_id = self.is_loggedin(par["cookie"])
 				if (_id == None):
 					return Responce("Unauthorized", 401)
-				par.id = _id
+				par["id"] = _id
 				return func(par)
 			return wrapper
 		return decorator
