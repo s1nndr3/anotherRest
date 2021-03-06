@@ -37,11 +37,11 @@ def logout(par):
 		return Responce("Not logged in", 401)
 	return Responce("logged out", 200, h)
 
-## par have the fields:
-# 	* par.data (The data/body from the request)
-#	* par.request (The request i.e. everything after "?" in the url)
-#	* par.id (If @log.login_required() is present this will hold the user id)
-#	* self.cookie (The cookie; if there was one with the request)
+## par have the fields (is a dictionaries):
+# 	* par["data"] (The data/body from the request)
+#	* par["request"] (The request i.e. everything after "?" in the url)
+#	* par["id"] (If @log.login_required() is present this will hold the user id)
+#	* self["cookie"] (The cookie; if there was one with the request)
 
 # Start the API
 if __name__ == "__main__":
