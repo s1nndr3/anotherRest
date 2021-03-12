@@ -248,6 +248,7 @@ def _handle(conn, addr, funcs):
 	par = {
 		"cookie": cookie,
 		"data": data,
+		"body": body,
 		"request": request,
 		"id": None
 	}
