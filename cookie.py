@@ -16,7 +16,7 @@ def cookie_encode(raw_cookie, key):
 		ciper_text_b = cipher.encrypt(pad(j, AES.block_size))
 		iv = cipher.iv
 		cookie_encoded = b64encode(iv + ciper_text_b)
-		return cookie_encoded
+		return cookie_encoded.decode('utf-8')
 
 def cookie_decode(_input, key):
 	try:

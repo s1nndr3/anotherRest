@@ -155,6 +155,8 @@ def Responce(data: str, code: int, headder_add = None, text_type = "text/plain",
 	headder = f"HTTP/1.1 {code}  {status}\r\n"
 	headder += f"Content-Type: {text_type}; charset=utf-8\r\n"
 	headder += f"Content-Length: {len(data)+file_size}\r\n"
+	headder += "Access-Control-Allow-Origin: http://localhost:3000\r\n"
+	headder += "Access-Control-Allow-Credentials: true\r\n"
 	if(headder_add):
 		headder += f"{headder_add}\r\n"
 	headder += "\r\n"
@@ -231,9 +233,11 @@ def _handle(conn, addr, funcs):
 	data = data.strip().decode('utf-8')
 	header = str_partition(data, None, "\r\n\r\n")
 	body = str_partition(data, "\r\n\r\n", None)
-	cookie = str_partition(header, "Cookie: acc=", "\n")#Selecting just the first
-	if(cookie):
-		cookie = cookie[2:].encode() #not pretty, but it works
+	try:
+		cookie = {f"{C.split('=',1)[0]}":f"{C.split('=',1)[1]}" for C in header.split("Cookie: ")[1].split("\n")[0].split("; ")}
+	except IndexError:
+		cookie = {"acc":None} #No cookie
+	
 
 	"""Find method, url/path and request"""
 	method = str_partition(header, None, (" "))
@@ -252,6 +256,7 @@ def _handle(conn, addr, funcs):
 		"request": request,
 		"id": None
 	}
+
 
 	"""Call correct function and get back a responce"""
 	responce = None
@@ -324,7 +329,7 @@ class Login():
 	def login_required(self, r_type = None):
 		def decorator(func):
 			def wrapper(par):
-				_id = self.is_loggedin(par["cookie"])
+				_id = self.is_loggedin(par["cookie"]["acc"])
 				if (_id == None):
 					return Responce("Unauthorized", 401)
 				par["id"] = _id
