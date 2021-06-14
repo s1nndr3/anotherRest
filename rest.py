@@ -55,8 +55,8 @@ class RestApi(Loging):
 			self.wrapped_socket = self.socket
 
 	""" Call this when user want to start the server """
-	def start(self):
-		for i in range(0, 3):
+	def start(self, n = 3):
+		for i in range(0, n):
 			t = th.Thread(target=worker, args=(self.work_queue, i, self.func))
 			t.start()
 			self.work_pool.append(t)
@@ -177,27 +177,36 @@ class work_list():
 
 	""" Put value at the beginning """
 	def put(self, val, timeout = -1):
-		self.cond_v.acquire(blocking=True, timeout=timeout)
-		
+		if not (self.cond_v.acquire(blocking=True, timeout=timeout)):
+			return False
 		self.list.insert(0, val)
-
 		self.cond_v.notify(n=1)
 		self.cond_v.release()
 
 	""" Pop from the end"""
 	def get(self, timeout = -1):
 		while(True):
-			self.cond_v.acquire(blocking=True, timeout=timeout)
+			if not (self.cond_v.acquire(blocking=True, timeout=timeout)):
+				return False
 			if (len(self.list) > 0):
 				val = self.list.pop()
 				self.cond_v.release()
 				return val
 			else:
-				self.cond_v.wait(timeout=None) #wait for more
+				out = None if timeout == -1 else timeout
+				if not (self.cond_v.wait(timeout=out)):
+					self.cond_v.release()
+					return False
 				self.cond_v.release()
 
-	def empty(self):
-		return (len(self.list) == 0)
+	""" Empthy the list """
+	def delete(self, timeout = -1):
+		if not (self.cond_v.acquire(blocking=True, timeout=timeout)):
+			return False
+		print("delete from list:")
+		while len(self.list) > 0:
+			print(f"    {self.list.pop()}")
+		self.cond_v.release()
 
 """ Thread worker
 	- wait on something to handle
