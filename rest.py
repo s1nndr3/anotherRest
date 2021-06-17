@@ -155,7 +155,7 @@ def Responce(data: str, code: int, headder_add = None, text_type = "text/plain",
 	headder = f"HTTP/1.1 {code}  {status}\r\n"
 	headder += f"Content-Type: {text_type}; charset=utf-8\r\n"
 	headder += f"Content-Length: {len(data)+file_size}\r\n"
-	headder += "Access-Control-Allow-Origin: http://localhost:3000\r\n"
+	headder += "Access-Control-Allow-Origin: https://localhost:3000\r\n"
 	headder += "Access-Control-Allow-Credentials: true\r\n"
 	if(headder_add):
 		headder += f"{headder_add}\r\n"
@@ -276,8 +276,14 @@ def _handle(conn, addr, funcs):
 		except Exception as e:
 			print(e)
 			responce = Responce("error", 400)
+	elif(method == "OPTIONS"):
+		methods = [x[1] for x in funcs if x[0] == path]
+		print(methods)
+		header = "Access-Control-Allow-Methods: OPTIONS, " + ", ".join(methods)
+		print(header)
+		responce = Responce("", 200, headder_add=header)
 	else:
-		print("Error: Endpoint do not exist!!!!")
+		print(f"Error: Endpoint {path} method {method} do not exist!!!!")
 		responce = Responce("Endpoint do not exist", 404)
 	if not responce:
 		responce = Responce("Server error", 500)
