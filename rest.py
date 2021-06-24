@@ -322,8 +322,8 @@ class Login():
 		self.AES_key = AES_key if AES_key else get_random_bytes(16)
 		print(self.AES_key)
 
-	def login(self, acc_id:int, expires:int):
-		raw = new_raw_cookie(acc_id=acc_id, expires=expires)
+	def login(self, acc_id:int, expires:int, other = None):
+		raw = new_raw_cookie(acc_id=acc_id, expires=expires, other=other)
 		headder = cookie_headder(cookie_encode(raw, self.AES_key))
 		return headder
 
@@ -331,23 +331,25 @@ class Login():
 		if not self.is_loggedin(cookie):
 			raise Exception("Was not logged in")
 
-		headder = cookie_headder(cookie, 0)
-		return headder
+		header = cookie_headder("deleted", -1)
+		return header
 
 	def is_loggedin(self, cookie):
 		if(not cookie):
 			return None
 
 		raw = cookie_decode(cookie, self.AES_key)
-		return json.loads(raw)["acc_id"]
+		return json.loads(raw)
 
-	def login_required(self, r_type = None):
+	def login_required(self, veryfy = None):
 		def decorator(func):
 			def wrapper(par):
-				_id = self.is_loggedin(par["cookie"]["acc"])
-				if (_id == None):
+				j = self.is_loggedin(par["cookie"]["acc"])
+				if (j == None):
 					return Responce("Unauthorized", 401)
-				par["id"] = _id
+				if callable(veryfy) and not veryfy(j):
+					return Responce("Unauthorized", 401)
+				par["id"] = j["acc_id"]
 				return func(par)
 			return wrapper
 		return decorator

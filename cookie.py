@@ -29,16 +29,17 @@ def cookie_decode(_input, key):
 	except ValueError and KeyError and TypeError:
 		return None
 
-def new_raw_cookie(session_id = "-1", acc_id = "-1", expires = "-1"):
-	json_str = "{"
-	json_str += f"\"session_id\": \"{session_id}\"" 
-	json_str += f", \"acc_id\": \"{acc_id}\"" 
-	json_str += f", \"expires\": \"{expires}\""
-	json_str += "}"
-	return json_str#json.loads(json_str)
+def new_raw_cookie(session_id = "-1", acc_id = "-1", expires = "-1", other = None):
+	raw = {
+		"session_id": session_id,
+		"acc_id": acc_id,
+		"expires": expires,
+		"other": other
+	}
+	return json.dumps(raw)
 
 def cookie_headder(cookie_encoded, max_age = 432000):
 	if (cookie_encoded):
-		return f"Set-Cookie: acc={cookie_encoded}; SameSite=Strict; Secure; Max-Age={max_age}"
+		return f"Set-Cookie: acc={cookie_encoded}; SameSite=Strict; Max-Age={max_age}"
 	else:
 		return None
