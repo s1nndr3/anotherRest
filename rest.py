@@ -58,7 +58,7 @@ class RestApi(Loging):
 	""" Call this when user want to start the server """
 	def start(self, n = 3):
 		for i in range(0, n):
-			t = th.Thread(target=worker, args=(self.work_queue, i, self.func))
+			t = th.Thread(target=worker, args=(self, self.work_queue, i, self.func))
 			t.start()
 			self.work_pool.append(t)
 
@@ -147,15 +147,17 @@ class RestApi(Loging):
 
 	def Responce(self, origin, *args, **kwargs):
 		print(origin)
+		print(kwargs)
 		if origin in self.allow_origin:
-			string = f"Access-Control-Allow-Origin: {origin}"
-			kwargs["header_add"] = [string] if "header_add" not in kwargs else kwargs["header_add"].append(string)
+			allow = [f"Access-Control-Allow-Origin: {origin}"]
+			kwargs["header_add"] = allow if "header_add" not in kwargs else kwargs["header_add"] + allow
+		print(kwargs)
 		return Responce(*args, **kwargs)
 
 
 """ Response function """
 def Responce(data: str, code: int, header_add = None, text_type = "text/plain", fp = None):
-
+	print(f"header add = {header_add}")
 	status = get_status(code)
 
 	file_size = 0 if not fp else os.path.getsize(fp.name)
@@ -219,7 +221,7 @@ class work_list():
 """ Thread worker
 	- wait on something to handle
 	- -1 is exit code """
-def worker(queue, _id, funcs):
+def worker(API, queue, _id, funcs):
 	print(f"Hello from process {_id}")
 	while(True):
 		c = queue.get()
@@ -227,12 +229,12 @@ def worker(queue, _id, funcs):
 			return
 		conn = c["conn"]
 		addr = c["addr"]
-		_handle(conn, addr, funcs)
+		_handle(API, conn, addr, funcs)
 
 
 """ Function that handles each request
 	- Note. Started by multiple threads simultaneously"""
-def _handle(conn, addr, funcs):
+def _handle(API, conn, addr, funcs):
 	ip_addr = str_partition(str(addr), ("('"), ("',"))
 
 	"""Retrive raw data"""
@@ -286,18 +288,16 @@ def _handle(conn, addr, funcs):
 			responce = func_entry[2](par)
 		except Exception as e:
 			print(e)
-			responce = Responce("error", 400)
+			responce = API.Responce(origin, "error", 400)
 	elif(method == "OPTIONS"):
 		methods = [x[1] for x in funcs if x[0] == path]
-		print(methods)
-		header = "Access-Control-Allow-Methods: OPTIONS, " + ", ".join(methods)
-		print(header)
-		responce = self.Responce(origin, "", 200, header_add=header)
+		header = ["Access-Control-Allow-Methods: OPTIONS, " + ", ".join(methods)]
+		responce = API.Responce(origin, "", 200, header_add=header)
 	else:
 		print(f"Error: Endpoint {path} method {method} do not exist!!!!")
-		responce = self.Responce(origin, "Endpoint do not exist", 404)
+		responce = API.Responce(origin, "Endpoint do not exist", 404)
 	if not responce:
-		responce = self.Responce(origin, "Server error", 500)
+		responce = API.Responce(origin, "Server error", 500)
 
 	"""Send responce and close conection"""
 	#if type(responce) == tuple:
