@@ -19,9 +19,10 @@ else:
 	from httpstatus import get_status
 
 class RestApi(Loging):
-	def __init__(self, port = 8080, host = "localhost", cert = None, log_file = "connection_log.txt"):
+	def __init__(self, port = 8080, host = "localhost", cert = None, log_file = "connection_log.txt", allow_origin : list = None):
 		self.port = port
 		self.host = host
+		self.allow_origin = allow_origin # Access-Control-Allow-Origin header
 		
 		self.func = []
 		self.log_file = log_file
@@ -144,26 +145,33 @@ class RestApi(Loging):
 			self._makefunction(str(loc), str(f), str(pre))
 			print(f"made: {pre}/{f}")
 
+	def Responce(self, origin, *args, **kwargs):
+		print(origin)
+		if origin in self.allow_origin:
+			string = f"Access-Control-Allow-Origin: {origin}"
+			kwargs["header_add"] = [string] if "header_add" not in kwargs else kwargs["header_add"].append(string)
+		return Responce(*args, **kwargs)
+
 
 """ Response function """
-def Responce(data: str, code: int, headder_add = None, text_type = "text/plain", fp = None):
+def Responce(data: str, code: int, header_add = None, text_type = "text/plain", fp = None):
 
 	status = get_status(code)
 
 	file_size = 0 if not fp else os.path.getsize(fp.name)
 
-	headder = f"HTTP/1.1 {code}  {status}\r\n"
-	headder += f"Content-Type: {text_type}; charset=utf-8\r\n"
-	headder += f"Content-Length: {len(data)+file_size}\r\n"
-	headder += "Access-Control-Allow-Origin: https://localhost:3000\r\n"
-	headder += "Access-Control-Allow-Credentials: true\r\n"
-	if(headder_add):
-		headder += f"{headder_add}\r\n"
-	headder += "\r\n"
+	header = f"HTTP/1.1 {code}  {status}\r\n"
+	header += f"Content-Type: {text_type}; charset=utf-8\r\n"
+	header += f"Content-Length: {len(data)+file_size}\r\n"
+	header += "Access-Control-Allow-Credentials: true\r\n"
 
-	responce = headder + data
+	header = header if not header_add else header + "\r\n".join(header_add) + "\r\n"
+
+	header += "\r\n"
+
+	responce = header + data
 	
-	#print(responce)
+	print(responce)
 	return [responce, fp]
 
 
@@ -251,19 +259,22 @@ def _handle(conn, addr, funcs):
 	"""Find method, url/path and request"""
 	method = str_partition(header, None, (" "))
 	url = str_partition(header, (" "), (" "))
+	host = str_partition(header, ("Host: "), ("\r\n"))
+	origin = str_partition(header, ("Origin: "), ("\r\n"))
 
 	path, request, *_ = url.split("?") + [None]
 
 	func_entry = [x for x in funcs if x[0] == path and x[1] == method]
 	print(func_entry)
 
-
 	par = {
 		"cookie": cookie,
 		"data": data,
 		"body": body,
 		"request": request,
-		"id": None
+		"id": None,
+		"host": host,
+		"origin": origin
 	}
 
 
@@ -281,12 +292,12 @@ def _handle(conn, addr, funcs):
 		print(methods)
 		header = "Access-Control-Allow-Methods: OPTIONS, " + ", ".join(methods)
 		print(header)
-		responce = Responce("", 200, headder_add=header)
+		responce = self.Responce(origin, "", 200, header_add=header)
 	else:
 		print(f"Error: Endpoint {path} method {method} do not exist!!!!")
-		responce = Responce("Endpoint do not exist", 404)
+		responce = self.Responce(origin, "Endpoint do not exist", 404)
 	if not responce:
-		responce = Responce("Server error", 500)
+		responce = self.Responce(origin, "Server error", 500)
 
 	"""Send responce and close conection"""
 	#if type(responce) == tuple:
