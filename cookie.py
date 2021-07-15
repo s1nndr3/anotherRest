@@ -40,6 +40,6 @@ def new_raw_cookie(session_id = "-1", acc_id = "-1", expires = "-1", other = Non
 
 def cookie_headder(cookie_encoded, max_age = 432000):
 	if (cookie_encoded):
-		return f"Set-Cookie: acc={cookie_encoded}; SameSite=Strict; Max-Age={max_age}"
+		return f"Set-Cookie: acc={cookie_encoded}; SameSite=Strict; Max-Age={max_age}; Secure=true"
 	else:
 		return None

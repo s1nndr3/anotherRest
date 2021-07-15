@@ -146,18 +146,14 @@ class RestApi(Loging):
 			print(f"made: {pre}/{f}")
 
 	def Responce(self, origin, *args, **kwargs):
-		print(origin)
-		print(kwargs)
 		if origin in self.allow_origin:
 			allow = [f"Access-Control-Allow-Origin: {origin}"]
 			kwargs["header_add"] = allow if "header_add" not in kwargs else kwargs["header_add"] + allow
-		print(kwargs)
 		return Responce(*args, **kwargs)
 
 
 """ Response function """
 def Responce(data: str, code: int, header_add = None, text_type = "text/plain", fp = None):
-	print(f"header add = {header_add}")
 	status = get_status(code)
 
 	file_size = 0 if not fp else os.path.getsize(fp.name)
@@ -173,7 +169,6 @@ def Responce(data: str, code: int, header_add = None, text_type = "text/plain", 
 
 	responce = header + data
 	
-	print(responce)
 	return [responce, fp]
 
 
@@ -278,7 +273,6 @@ def _handle(API, conn, addr, funcs):
 		"host": host,
 		"origin": origin
 	}
-
 
 	"""Call correct function and get back a responce"""
 	responce = None
