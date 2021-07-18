@@ -246,18 +246,28 @@ def _handle(API, conn, addr, funcs):
 	"""Decode data and split in to header and body"""
 	data = data.strip().decode('utf-8')
 	header = str_partition(data, None, "\r\n\r\n")
-	body = str_partition(data, "\r\n\r\n", None)
 	try:
 		cookie = {f"{C.split('=',1)[0]}":f"{C.split('=',1)[1]}" for C in header.split("Cookie: ")[1].split("\n")[0].split("; ")}
 	except IndexError:
 		cookie = {"acc":None} #No cookie
 	
+	content_len = int(str_partition(header, ("Content-Length: "), ("\r\n")))
+	body = str_partition(data, "\r\n\r\n", None)
+	received = (0 if not body else len(body))
+	if content_len > received:
+		rest_len = content_len - received
+		rest = b''
+		while rest_len > 0:
+			rest += conn.recv(1024)
+			rest_len -= 1024
+		body = rest if not body else body + rest
 
 	"""Find method, url/path and request"""
 	method = str_partition(header, None, (" "))
 	url = str_partition(header, (" "), (" "))
 	host = str_partition(header, ("Host: "), ("\r\n"))
 	origin = str_partition(header, ("Origin: "), ("\r\n"))
+	content_type = str_partition(header, ("Content-Type: "), ("\r\n"))
 
 	path, request, *_ = url.split("?") + [None]
 
@@ -271,7 +281,8 @@ def _handle(API, conn, addr, funcs):
 		"request": request,
 		"id": None,
 		"host": host,
-		"origin": origin
+		"origin": origin,
+		"content_type": content_type
 	}
 
 	"""Call correct function and get back a responce"""
