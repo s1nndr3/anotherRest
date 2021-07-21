@@ -251,7 +251,11 @@ def _handle(API, conn, addr, funcs):
 	except IndexError:
 		cookie = {"acc":None} #No cookie
 	
-	content_len = int(str_partition(header, ("Content-Length: "), ("\r\n")))
+	try:
+		content_len = int(str_partition(header, ("Content-Length: "), ("\r\n")))
+	except TypeError:
+		content_len = 0
+
 	body = str_partition(data, "\r\n\r\n", None)
 	received = (0 if not body else len(body))
 	if content_len > received:
@@ -260,7 +264,7 @@ def _handle(API, conn, addr, funcs):
 		while rest_len > 0:
 			rest += conn.recv(1024)
 			rest_len -= 1024
-		body = rest if not body else body + rest
+		body = rest if not body else body + rest.decode("utf-8")
 
 	"""Find method, url/path and request"""
 	method = str_partition(header, None, (" "))
