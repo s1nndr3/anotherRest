@@ -234,18 +234,19 @@ def _handle(API, conn, addr, funcs):
 
 	"""Retrive raw data"""
 	try:
-		data = conn.recv(1024)
+		data_raw = conn.recv(1024)
 		#print(data)
 	except ssl.SSLError as error:
 		print(f"ssl error when reciving data {error}")
 		return
 
-	if not data:
+	if not data_raw:
 		return
 
-	"""Decode data and split in to header and body"""
-	data = data.strip().decode('utf-8')
-	header = str_partition(data, None, "\r\n\r\n")
+	"""split in to header and body, and decode header"""
+	header, body = data_raw.split(b"\r\n\r\n", 1)
+	header = header.decode('utf-8')
+
 	try:
 		cookie = {f"{C.split('=',1)[0]}":f"{C.split('=',1)[1]}" for C in header.split("Cookie: ")[1].split("\n")[0].split("; ")}
 	except IndexError:
@@ -256,7 +257,6 @@ def _handle(API, conn, addr, funcs):
 	except TypeError:
 		content_len = 0
 
-	body = str_partition(data, "\r\n\r\n", None)
 	received = (0 if not body else len(body))
 	if content_len > received:
 		rest_len = content_len - received
@@ -264,7 +264,7 @@ def _handle(API, conn, addr, funcs):
 		while rest_len > 0:
 			rest += conn.recv(1024)
 			rest_len -= 1024
-		body = rest if not body else body + rest.decode("utf-8")
+		body = rest if not body else body + rest
 
 	"""Find method, url/path and request"""
 	method = str_partition(header, None, (" "))
@@ -280,7 +280,7 @@ def _handle(API, conn, addr, funcs):
 
 	par = {
 		"cookie": cookie,
-		"data": data,
+		"data": data_raw,
 		"body": body,
 		"request": request,
 		"id": None,
