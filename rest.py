@@ -263,8 +263,6 @@ def _handle(API, conn, addr, funcs):
 	except Exception as error:
 		print(f"error in get_header: {error}")
 
-	print(f"\n\n\n{header}")
-
 	try:
 		cookie = {f"{C.split('=',1)[0]}":f"{C.split('=',1)[1]}" for C in header.split("Cookie: ")[1].split("\n")[0].split("; ")}
 	except IndexError:
