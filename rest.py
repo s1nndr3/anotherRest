@@ -251,7 +251,6 @@ def _handle(API, conn, addr, funcs):
 		try:
 			header, body = raw.split(b"\r\n\r\n", 1)
 		except ValueError:
-			print("test")
 			data_raw = conn.recv(1024)
 			return get_header(raw+data_raw)
 			""" header = data_raw.split(b"\r\n\r\n", 1)[0]
@@ -381,7 +380,6 @@ class Login():
 	def is_loggedin(self, cookie):
 		if(not cookie):
 			return None
-		print(cookie)
 		raw = cookie_decode(cookie, self.AES_key)
 		return json.loads(raw)
 
