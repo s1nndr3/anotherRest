@@ -239,13 +239,31 @@ def _handle(API, conn, addr, funcs):
 	except ssl.SSLError as error:
 		print(f"ssl error when reciving data {error}")
 		return
+	except ConnectionResetError as error:
+		print(f"ConnectionResetError error when reciving data: {error}")
+		return
 
 	if not data_raw:
 		return
 
 	"""split in to header and body, and decode header"""
-	header, body = data_raw.split(b"\r\n\r\n", 1)
-	header = header.decode('utf-8')
+	def get_header(raw):
+		try:
+			header, body = raw.split(b"\r\n\r\n", 1)
+		except ValueError:
+			print("test")
+			data_raw = conn.recv(1024)
+			return get_header(raw+data_raw)
+			""" header = data_raw.split(b"\r\n\r\n", 1)[0]
+			body = None """
+		return header.decode('utf-8'), body, raw
+
+	try:
+		header, body, data_raw = get_header(data_raw)
+	except Exception as error:
+		print(f"error in get_header: {error}")
+
+	print(f"\n\n\n{header}")
 
 	try:
 		cookie = {f"{C.split('=',1)[0]}":f"{C.split('=',1)[1]}" for C in header.split("Cookie: ")[1].split("\n")[0].split("; ")}
@@ -262,8 +280,16 @@ def _handle(API, conn, addr, funcs):
 		rest_len = content_len - received
 		rest = b''
 		while rest_len > 0:
-			rest += conn.recv(1024)
-			rest_len -= 1024
+			try:
+				rest += conn.recv(1024)
+				rest_len -= 1024
+			except  ssl.SSLError as error:
+				print(f"ssl error when reciving data {error}")
+				return
+			except ConnectionResetError as error:
+				print(f"ConnectionResetError error when reciving rest of data: {error}")
+				return
+
 		body = rest if not body else body + rest
 
 	"""Find method, url/path and request"""
@@ -296,7 +322,7 @@ def _handle(API, conn, addr, funcs):
 		try:
 			responce = func_entry[2](par)
 		except Exception as e:
-			print(e)
+			print(f"Exception in endpoint: {e}")
 			responce = API.Responce(origin, "error", 400)
 	elif(method == "OPTIONS"):
 		methods = [x[1] for x in funcs if x[0] == path]
@@ -357,7 +383,7 @@ class Login():
 	def is_loggedin(self, cookie):
 		if(not cookie):
 			return None
-
+		print(cookie)
 		raw = cookie_decode(cookie, self.AES_key)
 		return json.loads(raw)
 
