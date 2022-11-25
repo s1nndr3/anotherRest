@@ -18,7 +18,7 @@ def cookie_encode(raw_cookie, key):
 		cookie_encoded = b64encode(iv + ciper_text_b)
 		return cookie_encoded.decode('utf-8')
 
-def cookie_decode(_input, key):
+def cookie_decode(_input, key) -> str:
 	try:
 		inn = b64decode(_input)
 		iv = inn[:AES.block_size]
@@ -27,7 +27,7 @@ def cookie_decode(_input, key):
 		pt = unpad(cipher.decrypt(ct), AES.block_size)
 		return pt.decode("utf-8")
 	except ValueError and KeyError and TypeError:
-		return None
+		return ""
 
 def new_raw_cookie(session_id = "-1", acc_id = "-1", expires = "-1", other = None):
 	raw = {
@@ -38,8 +38,8 @@ def new_raw_cookie(session_id = "-1", acc_id = "-1", expires = "-1", other = Non
 	}
 	return json.dumps(raw)
 
-def cookie_headder(cookie_encoded, max_age = 432000):
+def cookie_headder(cookie_encoded, max_age = 432000) -> str:
 	if (cookie_encoded):
 		return f"Set-Cookie: acc={cookie_encoded}; SameSite=Strict; Max-Age={max_age}; Secure=true"
 	else:
-		return None
+		return ""

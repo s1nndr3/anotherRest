@@ -2,7 +2,7 @@
 #Version: 0.0.2 March 2021
 #By Sindre Sønvisen sindre@sundvis.net
 
-from socket import *
+from socket import socket, SOCK_STREAM, AF_INET
 import threading as th
 import time
 import ssl
@@ -19,7 +19,7 @@ else:
 	from httpstatus import get_status
 
 class RestApi(Loging):
-	def __init__(self, port = 8080, host = "localhost", cert = None, log_file = "connection_log.txt", allow_origin : list = None):
+	def __init__(self, port = 8080, host = "localhost", cert = None, log_file = "connection_log.txt", allow_origin : list = []):
 		self.port = port
 		self.host = host
 		self.allow_origin = allow_origin # Access-Control-Allow-Origin header
@@ -29,8 +29,6 @@ class RestApi(Loging):
 
 		self.work_pool = []
 		self.work_queue = work_list()
-
-		self.socket = self.wrapped_socket = None
 
 		#Create socket
 		self._setup_socket(cert)
@@ -146,14 +144,14 @@ class RestApi(Loging):
 			print(f"made: {pre}/{f}")
 
 	def Responce(self, origin, *args, **kwargs):
-		if origin in self.allow_origin:
+		if self.allow_origin and origin in self.allow_origin:
 			allow = [f"Access-Control-Allow-Origin: {origin}"]
 			kwargs["header_add"] = allow if "header_add" not in kwargs else kwargs["header_add"] + allow
 		return Responce(*args, **kwargs)
 
 
 """ Response function """
-def Responce(data: str, code: int, header_add = None, text_type = "text/plain", fp = None):
+def Responce(data: str, code: int, header_add: list[str] = [], text_type = "text/plain", fp = None):
 	status = get_status(code)
 
 	file_size = 0 if not fp else os.path.getsize(fp.name)
@@ -163,7 +161,7 @@ def Responce(data: str, code: int, header_add = None, text_type = "text/plain", 
 	header += f"Content-Length: {len(data)+file_size}\r\n"
 	header += "Access-Control-Allow-Credentials: true\r\n"
 
-	header = header if not header_add else header + "\r\n".join(header_add) + "\r\n"
+	header = header if len(header_add) == 0 else header + "\r\n".join(header_add) + "\r\n"
 
 	header += "\r\n"
 
@@ -246,6 +244,7 @@ def _handle(API, conn, addr, funcs):
 	if not data_raw:
 		return
 
+	body = header = ""
 	"""split in to header and body, and decode header"""
 	def get_header(raw):
 		try:
@@ -270,6 +269,8 @@ def _handle(API, conn, addr, funcs):
 	try:
 		content_len = int(str_partition(header, ("Content-Length: "), ("\r\n")))
 	except TypeError:
+		content_len = 0
+	except ValueError:
 		content_len = 0
 
 	received = (0 if not body else len(body))
@@ -342,20 +343,20 @@ def _handle(API, conn, addr, funcs):
 		conn.send(l)
 	conn.close()
 
-def str_partition(str, start = None, end = None):
+def str_partition(str, start = None, end = None) -> str  :
 	ret = str
 
 	if (start != None):
 		try:
 			ret = ret.split(start)[1]
 		except IndexError:
-			return None
+			return ""
 
 	if (end != None):
 		try:
 			ret = ret.split(end)[0]
 		except IndexError:
-			return None
+			return ""
 	return ret
 
 
@@ -365,17 +366,17 @@ class Login():
 		self.AES_key = AES_key if AES_key else get_random_bytes(16)
 		print(self.AES_key)
 
-	def login(self, acc_id:int, expires:int, other = None):
-		raw = new_raw_cookie(acc_id=acc_id, expires=expires, other=other)
+	def login(self, acc_id:int, expires:int, other = None) -> list[str]:
+		raw = new_raw_cookie(acc_id=str(acc_id), expires=str(expires), other=other)
 		headder = cookie_headder(cookie_encode(raw, self.AES_key))
-		return headder
+		return [headder] if headder != "" else []
 
 	def logout(self, cookie):
 		if not self.is_loggedin(cookie):
 			raise Exception("Was not logged in")
 
 		header = cookie_headder("deleted", -1)
-		return header
+		return [header] if header != "" else []
 
 	def is_loggedin(self, cookie):
 		if(not cookie):

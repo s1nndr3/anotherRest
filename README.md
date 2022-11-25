@@ -9,9 +9,6 @@ Note. work in progress ***Do not use for critical work or sensetive data.***
 - Simple Login system.
 
 ### Required packages:
-- pandas
-- Crypto
-- pycrypto
 - pycryptodome
 
 #### Disclaimer:
