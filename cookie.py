@@ -3,6 +3,7 @@ from Crypto.Cipher import AES
 from Crypto.Random import get_random_bytes
 from Crypto.Util.Padding import pad, unpad
 from base64 import b64encode, b64decode
+from anotherRest.request_decode import decode, encode
 
 """The session is first converted to a JSON string. 
 The string of JSON is encrypted using the AES 256 standard which turns it into garbled bytes. 
@@ -20,7 +21,7 @@ def cookie_encode(raw_cookie, key):
 
 def cookie_decode(_input, key) -> str:
 	try:
-		inn = b64decode(_input)
+		inn = b64decode(decode(_input))
 		iv = inn[:AES.block_size]
 		ct = inn[AES.block_size:]
 		cipher = AES.new(key, AES.MODE_CBC, iv)
@@ -38,8 +39,9 @@ def new_raw_cookie(session_id = "-1", acc_id = "-1", expires = "-1", other = Non
 	}
 	return json.dumps(raw)
 
-def cookie_headder(cookie_encoded, max_age = 432000) -> str:
+def cookie_headder(cookie_encoded, max_age = 432000, path="/", domain="", HttpOnly=False) -> str:
 	if (cookie_encoded):
 		return f"Set-Cookie: acc={cookie_encoded}; SameSite=Strict; Max-Age={max_age}; Secure=true"
+		return f"Set-Cookie: acc={encode(cookie_encoded)}; SameSite=Strict; Max-Age={max_age}; Secure=true; path={path}" + (f"; Domain={domain}" if domain != "" else "") + ("; HttpOnly" if HttpOnly else "")
 	else:
 		return ""

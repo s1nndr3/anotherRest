@@ -19,10 +19,11 @@ else:
 	from httpstatus import get_status
 
 class RestApi(Loging):
-	def __init__(self, port = 8080, host = "localhost", cert = None, log_file = "connection_log.txt", allow_origin : list = []):
+	def __init__(self, port = 8080, host = "localhost", cert = None, log_file = "connection_log.txt", allow_origin : list = [], http_redirect : bool = False):
 		self.port = port
 		self.host = host
 		self.allow_origin = allow_origin # Access-Control-Allow-Origin header
+		self.http_redirect = http_redirect
 		
 		self.func = []
 		self.log_file = log_file
@@ -324,7 +325,7 @@ def _handle(API, conn, addr, funcs):
 			responce = API.Responce(origin, "error", 400)
 	elif(method == "OPTIONS"):
 		methods = [x[1] for x in funcs if x[0] == path]
-		header = ["Access-Control-Allow-Methods: OPTIONS, " + ", ".join(methods)]
+		header = ["Access-Control-Allow-Methods: OPTIONS, " + ", ".join(methods), "Access-Control-Allow-Headers: Authorization, Content-Type"]
 		responce = API.Responce(origin, "", 200, header_add=header)
 	else:
 		print(f"Error: Endpoint {path} method {method} do not exist!!!!")
@@ -366,16 +367,16 @@ class Login():
 		self.AES_key = AES_key if AES_key else get_random_bytes(16)
 		print(self.AES_key)
 
-	def login(self, acc_id:int, expires:int, other = None) -> list[str]:
+	def login(self, acc_id:int, expires:int, other = None, domain="") -> list[str]:
 		raw = new_raw_cookie(acc_id=str(acc_id), expires=str(expires), other=other)
-		headder = cookie_headder(cookie_encode(raw, self.AES_key))
+		headder = cookie_headder(cookie_encode(raw, self.AES_key), domain=domain)
 		return [headder] if headder != "" else []
 
-	def logout(self, cookie):
+	def logout(self, cookie, domain):
 		if not self.is_loggedin(cookie):
 			raise Exception("Was not logged in")
 
-		header = cookie_headder("deleted", -1)
+		header = cookie_headder("deleted", 0, domain=domain)
 		return [header] if header != "" else []
 
 	def is_loggedin(self, cookie):
