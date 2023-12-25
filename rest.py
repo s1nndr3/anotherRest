@@ -2,12 +2,14 @@
 #Version: 0.0.2 March 2021
 #By Sindre Sønvisen sindre@sundvis.net
 
+import io
 from socket import socket, SOCK_STREAM, AF_INET
 import threading as th
 import time
 import ssl
 import os
 import sys
+import types
 
 if __package__:
 	from .log import Loging
@@ -155,11 +157,11 @@ class RestApi(Loging):
 def Responce(data: str, code: int, header_add: list[str] = [], text_type = "text/plain", fp = None):
 	status = get_status(code)
 
-	file_size = 0 if not fp else os.path.getsize(fp.name)
-
 	header = f"HTTP/1.1 {code}  {status}\r\n"
 	header += f"Content-Type: {text_type}; charset=utf-8\r\n"
-	header += f"Content-Length: {len(data)+file_size}\r\n"
+	if (not isinstance(fp, types.GeneratorType) and fp):
+		file_size = 0 if not fp else os.path.getsize(fp.name)
+		header += f"Content-Length: {len(data)+file_size}\r\n"
 	header += "Access-Control-Allow-Credentials: true\r\n"
 
 	header = header if len(header_add) == 0 else header + "\r\n".join(header_add) + "\r\n"
@@ -334,15 +336,27 @@ def _handle(API, conn, addr, funcs):
 		responce = API.Responce(origin, "Server error", 500)
 
 	"""Send responce and close conection"""
-	#if type(responce) == tuple:
 	conn.send(responce[0].encode('utf-8'))
-	while responce[1]:
-		l = responce[1].read(1024)
-		if not l:
+	
+	if isinstance(responce[1], types.GeneratorType):
+		try:
+			for frame in responce[1]:
+				sendFile(conn, frame)
+		except ssl.SSLEOFError:
 			responce[1].close()
+	else:
+		sendFile(conn, responce[1])
+
+	conn.close()
+
+def sendFile(conn, fp, close = True):
+	while fp:
+		l = fp.read(1024)
+		if not l:
+			if close:
+				fp.close()
 			break
 		conn.send(l)
-	conn.close()
 
 def str_partition(str, start = None, end = None) -> str  :
 	ret = str
